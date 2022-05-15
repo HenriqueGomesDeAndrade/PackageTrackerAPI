@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PackageTrackerAPI.Entities;
 using PackageTrackerAPI.Models;
 using PackageTrackerAPI.Persistence;
@@ -26,6 +27,7 @@ namespace PackageTrackerAPI.Controllers
         {
             var package = new Package(model.Title, model.Weight);
             _context.Packages.Add(package);
+            _context.SaveChanges();
 
             return CreatedAtAction("GetByCode", new { code = package.Code }, package);
         }
@@ -33,7 +35,7 @@ namespace PackageTrackerAPI.Controllers
         [HttpGet("{code}")]
         public IActionResult GetByCode(string code)
         {
-            var package = _context.Packages.FirstOrDefault(p => p.Code == code);
+            var package = _context.Packages.Include(p => p.Updates).FirstOrDefault(p => p.Code == code);
 
             if (package == null)
             {
@@ -42,10 +44,10 @@ namespace PackageTrackerAPI.Controllers
             return Ok(package);
         }
 
-        [HttpPost("{code}")]
+        [HttpPost("{code}/update")]
         public IActionResult PostUpdate(string code, AddPackageUpdateInputModel model)
         {
-            var package = _context.Packages.FirstOrDefault(p => p.Code == code);
+            var package = _context.Packages.Include(p => p.Updates).FirstOrDefault(p => p.Code == code);
 
             if (package == null)
             {
@@ -54,7 +56,7 @@ namespace PackageTrackerAPI.Controllers
 
             package.AddUpdate(model.Status, model.Delivered);
 
-            _context.Packages.Add(package);
+            _context.SaveChanges();
 
             return Ok(package);
         }
