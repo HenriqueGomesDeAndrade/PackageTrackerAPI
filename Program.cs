@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PackageTrackerAPI.Entities;
 using PackageTrackerAPI.Persistence;
+using PackageTrackerAPI.Persistence.Repository;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,6 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("PackageTrackerCS");
 builder.Services.AddDbContext<PackageTrackerContext>(c => c.UseSqlServer(connectionString));
+
+builder.Services.AddScoped<IPackageRepository, PackageRepository>();
 
 builder.Services.AddControllers();
 

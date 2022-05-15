@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PackageTrackerAPI.Entities;
 using PackageTrackerAPI.Models;
 using PackageTrackerAPI.Persistence;
+using PackageTrackerAPI.Persistence.Repository;
 
 namespace PackageTrackerAPI.Controllers
 {
@@ -10,24 +11,24 @@ namespace PackageTrackerAPI.Controllers
     [Route("[controller]")]
     public class PackagesController : ControllerBase
     {
-        private readonly PackageTrackerContext _context;
-        public PackagesController(PackageTrackerContext context)
+        private readonly IPackageRepository _repository;
+        public PackagesController(IPackageRepository repository)
         {
-            _context = context;
+            _repository = repository;
         }
 
         [HttpGet]
         public IActionResult GetAll()
         {
-            return Ok(_context.Packages);
+            var packages = _repository.GetAll();
+            return Ok(packages);
         }
 
         [HttpPost]
         public IActionResult Post(AddPackageInputModel model)
         {
             var package = new Package(model.Title, model.Weight);
-            _context.Packages.Add(package);
-            _context.SaveChanges();
+            _repository.Add(package);
 
             return CreatedAtAction("GetByCode", new { code = package.Code }, package);
         }
@@ -35,7 +36,7 @@ namespace PackageTrackerAPI.Controllers
         [HttpGet("{code}")]
         public IActionResult GetByCode(string code)
         {
-            var package = _context.Packages.Include(p => p.Updates).FirstOrDefault(p => p.Code == code);
+            var package = _repository.GetByCode(code);
 
             if (package == null)
             {
@@ -47,7 +48,7 @@ namespace PackageTrackerAPI.Controllers
         [HttpPost("{code}/update")]
         public IActionResult PostUpdate(string code, AddPackageUpdateInputModel model)
         {
-            var package = _context.Packages.Include(p => p.Updates).FirstOrDefault(p => p.Code == code);
+            var package = _repository.GetByCode(code);
 
             if (package == null)
             {
@@ -56,7 +57,7 @@ namespace PackageTrackerAPI.Controllers
 
             package.AddUpdate(model.Status, model.Delivered);
 
-            _context.SaveChanges();
+            _repository.Update(package);
 
             return Ok(package);
         }
