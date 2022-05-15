@@ -1,9 +1,10 @@
 using PackageTrackerAPI.Entities;
+using PackageTrackerAPI.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-//builder.Services.AddSingleton<Package>();
+builder.Services.AddSingleton<PackageTrackerContext>();
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

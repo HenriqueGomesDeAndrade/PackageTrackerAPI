@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PackageTrackerAPI.Entities;
+using PackageTrackerAPI.Models;
+using PackageTrackerAPI.Persistence;
 
 namespace PackageTrackerAPI.Controllers
 {
@@ -7,18 +9,31 @@ namespace PackageTrackerAPI.Controllers
     [Route("[controller]")]
     public class PackagesController : ControllerBase
     {
-        List<Package> packages = new List<Package>();
+        private readonly PackageTrackerContext _context;
+        public PackagesController(PackageTrackerContext context)
+        {
+            _context = context;
+        }
 
         [HttpGet]
         public IActionResult GetAll()
         {
-            return Ok(packages);
+            return Ok(_context.Packages);
+        }
+
+        [HttpPost]
+        public IActionResult Post(AddPackageInputModel model)
+        {
+            var package = new Package(model.Title, model.Weight);
+            _context.Packages.Add(package);
+
+            return CreatedAtAction("GetByCode", new { code = package.Code }, package);
         }
 
         [HttpGet("{code}")]
         public IActionResult GetByCode(string code)
         {
-            var package = packages.FirstOrDefault(p => p.Code == code);
+            var package = _context.Packages.FirstOrDefault(p => p.Code == code);
 
             if (package == null)
             {
@@ -27,20 +42,20 @@ namespace PackageTrackerAPI.Controllers
             return Ok(package);
         }
 
-        [HttpPost]
-        public IActionResult Post(Package package)
-        {
-            package = new Package(package.Title, package.Weight);
-            packages.Add(package);
-
-            return CreatedAtAction("GetByCode", new {code = package.Code}, package);
-        }
-
         [HttpPost("{code}")]
-        public IActionResult PostUpdate(string code, PackageUpdate update)
+        public IActionResult PostUpdate(string code, AddPackageUpdateInputModel model)
         {
-            var package = packages.FirstOrDefault(p => p.Code == code);
-            package.Updates.Add(update);
+            var package = _context.Packages.FirstOrDefault(p => p.Code == code);
+
+            if (package == null)
+            {
+                return NotFound();
+            }
+
+            package.AddUpdate(model.Status, model.Delivered);
+
+            _context.Packages.Add(package);
+
             return Ok(package);
         }
     }

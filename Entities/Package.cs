@@ -19,5 +19,16 @@
             PostedAt = DateTime.Now;
             Updates = new List<PackageUpdate>();
         }
+
+        public void AddUpdate(string status, bool delivered)
+        {
+            if (Delivered)
+            {
+                throw new Exception("The package is already delivered");
+            }
+            var update = new PackageUpdate(Id, status);
+            Updates.Add(update);
+            Delivered = delivered;
+        }
     }
 }
