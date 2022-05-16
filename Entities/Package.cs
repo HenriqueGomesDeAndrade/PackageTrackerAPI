@@ -24,7 +24,7 @@
         {
             if (Delivered)
             {
-                throw new Exception("The package is already delivered");
+                throw new InvalidOperationException("The package is already delivered");
             }
             var update = new PackageUpdate(Id, status);
             Updates.Add(update);

@@ -7,6 +7,12 @@
     <UserSecretsId>2fc6aeec-3efa-45c5-a7cc-0826cef55bda</UserSecretsId>
   </PropertyGroup>
 
+    <PropertyGroup>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<NoWarn>
+			$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.5" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="6.0.5">
