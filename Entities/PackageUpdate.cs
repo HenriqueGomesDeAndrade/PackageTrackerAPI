@@ -13,5 +13,10 @@
             Status = status;
             UpdateDate = DateTime.Now;
         }
+
+        public void UpdatePackageUpdateStatus(string status)
+        {
+            Status = status;
+        }
     }
 }

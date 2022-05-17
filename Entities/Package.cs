@@ -30,5 +30,20 @@
             Updates.Add(update);
             Delivered = delivered;
         }
+
+        public void UpdatePackage(string title, decimal weight)
+        {
+            if (Updates.Any())
+            {
+                throw new InvalidOperationException("The package already has an Update");
+            }
+            Title = title;
+            Weight = weight;
+        }
+
+        public void UpdatePackage(bool delivered)
+        {
+            Delivered = delivered;
+        }
     }
 }
