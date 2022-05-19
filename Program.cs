@@ -28,7 +28,7 @@ builder.Services.AddSwaggerGen(o => {
     o.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "PackageTrackerAPI",
-        Description = "Essa é uma API para praticar C#",
+        Description = "Essa é uma API para praticar C#. A ideia da aqui é acompanhar a entrega de um pacote, portanto cada pacote pode ter várias atualizações.",
         Version = "v1",
         Contact = new OpenApiContact
         {
@@ -45,7 +45,8 @@ builder.Services.AddSwaggerGen(o => {
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+//Apenas para o swagger ficar ativo mesmo fora do ambiente de desenvolvimento
+if (true)
 {
     app.UseSwagger();
     app.UseSwaggerUI();
