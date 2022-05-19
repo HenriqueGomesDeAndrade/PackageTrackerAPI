@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PackageTrackerAPI.Emails;
 using PackageTrackerAPI.Entities;
 using PackageTrackerAPI.Models;
 using PackageTrackerAPI.Persistence;
@@ -14,11 +15,11 @@ namespace PackageTrackerAPI.Controllers
     public class PackagesController : ControllerBase
     {
         private readonly IPackageRepository _repository;
-        private readonly ISendGridClient _sendGridClient;
-        public PackagesController(IPackageRepository repository, ISendGridClient sendGridclient)
+        private readonly IEmailDependency _emailDependency;
+        public PackagesController(IPackageRepository repository, IEmailDependency emailDependency)
         {
             _repository = repository;
-            _sendGridClient = sendGridclient;
+            _emailDependency = emailDependency;
         }
 
 
@@ -45,7 +46,7 @@ namespace PackageTrackerAPI.Controllers
         }
 
         /// <summary>
-        /// Cadastro de um Pacote
+        /// Cadastro de um Pacote. As informações de "senderName" e "senderEmail" devem estar preenchidas para que as atualizações sejam enviadas por email.
         /// </summary>
         /// <remarks>
         /// {
@@ -70,19 +71,13 @@ namespace PackageTrackerAPI.Controllers
 
                 if (package.SenderEmail != null && package.SenderName != null)
                 {
-                    var message = new SendGridMessage
-                    {
-                        From = new EmailAddress("hgomes.andrade@gmail.com", "Henrique Andrade"),
-                        Subject = $"Hi {package.SenderName}, Your Package was dispatched!",
-                        PlainTextContent = $"Your package '{package.Title}' with code {package.Code} was dispatched"
-
-                    };
-
-                    message.AddTo(package.SenderEmail, package.SenderName);
-
-                    await _sendGridClient.SendEmailAsync(message);
+                    var message = _emailDependency
+                        .CreateMessage(
+                        $"Hi {package.SenderName}, Your Package was dispatched!",
+                        $"Your package '{package.Title}' with code {package.Code} was dispatched");
+                    _emailDependency.AddSenderToMessage(message, package);
+                    await _emailDependency.SendMessage(message);
                 }
-
                 return CreatedAtAction("GetByCode", new { code = package.Code }, package);
             }
             catch (Exception e)
@@ -123,6 +118,7 @@ namespace PackageTrackerAPI.Controllers
 
         /// <summary>
         /// Altera informações do pacote como o Título e o Peso. Se o Pacote já tiver alguma atualização, esses campos não podem ser alterados.
+        /// As informações de "senderName" e "senderEmail" devem estar preenchidas para que as atualizações sejam enviadas por email.
         /// </summary>
         /// <remarks>
         /// {
@@ -154,28 +150,20 @@ namespace PackageTrackerAPI.Controllers
 
                 if (package.SenderEmail != null && package.SenderName != null)
                 {
-                    var message = new SendGridMessage
-                    {
-                        From = new EmailAddress("hgomes.andrade@gmail.com", "Henrique Andrade"),
-                        Subject = "Your Package was updated",
-                        PlainTextContent = 
-                            $@"Your package '{package.Title}' with code {package.Code} was updated, his actual data is: 
+                    var message = _emailDependency
+                        .CreateMessage(
+                        "Your Package was updated",
+                        $@"Your package '{package.Title}' with code {package.Code} was updated, his actual data is: 
                                Title: {package.Title}
                                Weight: {package.Weight}
                                SenderEmail: {package.SenderEmail}
-                               SenderName: {package.SenderName}"
-                    };
-
-                    message.AddTo(package.SenderEmail, package.SenderName);
-
-                    await _sendGridClient.SendEmailAsync(message);
+                               SenderName: {package.SenderName}");
+                    _emailDependency.AddSenderToMessage(message, package);
+                    await _emailDependency.SendMessage(message);
                 }
-
-                
                 _repository.Update(package);
 
                 return Ok(package);
-
             }
             catch (InvalidOperationException e)
             {
@@ -190,7 +178,7 @@ namespace PackageTrackerAPI.Controllers
         }
 
         /// <summary>
-        /// Adiciona uma atualização de um pacote, de acordo com o código passado.
+        /// Adiciona uma atualização de um pacote, de acordo com o código passado. 
         /// </summary>
         /// <remarks>
         /// {
@@ -220,30 +208,24 @@ namespace PackageTrackerAPI.Controllers
 
                 if (package.SenderEmail != null && package.SenderName != null)
                 {
+
                     if (package.Delivered)
                     {
-                        var message = new SendGridMessage
-                        {
-                            From = new EmailAddress("hgomes.andrade@gmail.com", "Henrique Andrade"),
-                            Subject = "Your Package was delivered",
-                            PlainTextContent = $"Your package '{package.Title}' with code {package.Code} was delivered!!"
-
-                        };
-                        message.AddTo(package.SenderEmail, package.SenderName);
-                        await _sendGridClient.SendEmailAsync(message);
+                        var message = _emailDependency
+                        .CreateMessage(
+                        "Your Package was delivered",
+                         $"Your package '{package.Title}' with code {package.Code} was delivered!!");
+                        _emailDependency.AddSenderToMessage(message, package);
+                        await _emailDependency.SendMessage(message);
                     }
                     else
                     {
-                        var message = new SendGridMessage
-                        {
-                            From = new EmailAddress("hgomes.andrade@gmail.com", "Henrique Andrade"),
-                            Subject = "Your Package has a new Update",
-                            PlainTextContent = $"Your package '{package.Title}' with code {package.Code} has a new update: {packageUpdate.Status}"
-
-                        };
-                        message.AddTo(package.SenderEmail, package.SenderName);
-
-                        await _sendGridClient.SendEmailAsync(message);
+                        var message = _emailDependency
+                        .CreateMessage(
+                        "Your Package has a new Update",
+                         $"Your package '{package.Title}' with code {package.Code} has a new update: {packageUpdate.Status}");
+                        _emailDependency.AddSenderToMessage(message, package);
+                        await _emailDependency.SendMessage(message);
                     }
                 }
 
@@ -306,21 +288,14 @@ namespace PackageTrackerAPI.Controllers
                 {
                     if (package.Delivered)
                     {
-                        var message = new SendGridMessage
-                        {
-                            From = new EmailAddress("hgomes.andrade@gmail.com", "Henrique Andrade"),
-                            Subject = "Your Package was delivered",
-                            PlainTextContent = $"Your package '{package.Title}' with code {package.Code} was delivered!!"
-
-                        };
-
-                        message.AddTo(package.SenderEmail, package.SenderName);
-
-                        await _sendGridClient.SendEmailAsync(message);
-
+                        var message = _emailDependency
+                        .CreateMessage(
+                        "Your Package was delivered",
+                        $"Your package '{package.Title}' with code {package.Code} was delivered!!");
+                        _emailDependency.AddSenderToMessage(message, package);
+                        await _emailDependency.SendMessage(message);
                     } 
                 }
-
                 _repository.Update(package);
 
                 return Ok(package);

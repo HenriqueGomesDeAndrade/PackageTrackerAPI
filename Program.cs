@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using PackageTrackerAPI.Emails;
 using PackageTrackerAPI.Entities;
 using PackageTrackerAPI.Persistence;
 using PackageTrackerAPI.Persistence.Repository;
@@ -13,6 +14,7 @@ var connectionString = builder.Configuration.GetConnectionString("PackageTracker
 builder.Services.AddDbContext<PackageTrackerContext>(c => c.UseSqlServer(connectionString));
 
 builder.Services.AddScoped<IPackageRepository, PackageRepository>();
+builder.Services.AddScoped<IEmailDependency, EmailDependency>();
 
 var sendGridApiKey = builder.Configuration.GetSection("SendGridApiKey").Value;
 
