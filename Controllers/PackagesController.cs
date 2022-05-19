@@ -4,6 +4,8 @@ using PackageTrackerAPI.Entities;
 using PackageTrackerAPI.Models;
 using PackageTrackerAPI.Persistence;
 using PackageTrackerAPI.Persistence.Repository;
+using SendGrid;
+using SendGrid.Helpers.Mail;
 
 namespace PackageTrackerAPI.Controllers
 {
@@ -12,17 +14,20 @@ namespace PackageTrackerAPI.Controllers
     public class PackagesController : ControllerBase
     {
         private readonly IPackageRepository _repository;
-        public PackagesController(IPackageRepository repository)
+        private readonly ISendGridClient _sendGridClient;
+        public PackagesController(IPackageRepository repository, ISendGridClient sendGridclient)
         {
             _repository = repository;
+            _sendGridClient = sendGridclient;
         }
 
 
         /// <summary>
         /// Consulta de todos os pacotes
         /// </summary>
-        /// <returns>OTodos os pacotes</returns>
+        /// <returns>Todos os pacotes</returns>
         /// <response code="200">Retorna todos os pacotes, sem exibir as atualizações</response>
+        /// <response code="500">Ocorreu algum erro</response>
         [HttpGet]
         public IActionResult GetAll()
         {
@@ -32,14 +37,12 @@ namespace PackageTrackerAPI.Controllers
                 return Ok(packages);
 
             }
-            catch (Exception)
+            catch (Exception e )
             {
                 return StatusCode(StatusCodes.Status500InternalServerError,
-                    "Error retrieving data from the database");
+                    $"Error retrieving data from the database - {e.Message}");
             }
         }
-
-
 
         /// <summary>
         /// Cadastro de um Pacote
@@ -47,36 +50,56 @@ namespace PackageTrackerAPI.Controllers
         /// <remarks>
         /// {
         ///     "title" : "Pacote de Jogos"  ,
-        ///     "weight": 1.8
+        ///     "weight": 1.8,
+        ///     "senderName": "Henrique",
+        ///     "senderEmail": "hgomes.andrade@gmail.com"
         /// }
         /// </remarks>
         /// <param name="model">Dados do pacote</param>
-        /// <returns>Objeto recém-criado</returns>
+        /// <returns>Pacote recém-criado</returns>
         /// <response code="201">Cadastro realizado com sucesso</response>
         /// <response code="400">Dados estão inválidos</response>
+        /// <response code="500">Ocorreu algum erro</response>
         [HttpPost]
-        public IActionResult Post(AddPackageInputModel model)
+        public async Task<IActionResult> Post(AddPackageInputModel model)
         {
             try
             {
-                var package = new Package(model.Title, model.Weight);
+                var package = new Package(model.Title, model.Weight, model.SenderName, model.SenderEmail);
                 _repository.Add(package);
+
+                if (package.SenderEmail != null && package.SenderName != null)
+                {
+                    var message = new SendGridMessage
+                    {
+                        From = new EmailAddress("hgomes.andrade@gmail.com", "Henrique Andrade"),
+                        Subject = $"Hi {package.SenderName}, Your Package was dispatched!",
+                        PlainTextContent = $"Your package '{package.Title}' with code {package.Code} was dispatched"
+
+                    };
+
+                    message.AddTo(package.SenderEmail, package.SenderName);
+
+                    await _sendGridClient.SendEmailAsync(message);
+                }
 
                 return CreatedAtAction("GetByCode", new { code = package.Code }, package);
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError,
-                    "Error retrieving data from the database");
+                    $"Error retrieving data from the database - {e.Message}");
             }
         }
 
         /// <summary>
         /// Consulta um pacote filtrando pelo código.
         /// </summary>
-        /// <returns>Um pacote</returns>
+        /// <returns>Um pacote de acordo com o código passado</returns>
+        /// <param name="code">Código do pacote</param>
         /// <response code="200">Retorna um pacote de acordo com o código filtrado</response>
         /// <response code="404">O pacote com o código fornecido não foi encontrado</response>
+        /// <response code="500">Ocorreu algum erro</response>
         [HttpGet("{code}")]
         public IActionResult GetByCode(string code)
         {
@@ -90,10 +113,10 @@ namespace PackageTrackerAPI.Controllers
                 }
                 return Ok(package);
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError,
-                    "Error retrieving data from the database");
+                    $"Error retrieving data from the database - {e.Message}");
             }
             
         }
@@ -104,15 +127,19 @@ namespace PackageTrackerAPI.Controllers
         /// <remarks>
         /// {
         ///     "title": "Pacote De Cartas",
-        ///     "weight": 3.4
+        ///     "weight": 3.4,
+        ///     "senderName": "Henrique",
+        ///     "senderEmail": "hgomes.andrade@gmail.com"
         /// }
         /// </remarks>
-        /// <param name="model">Atualizações do pacote</param>
-        /// <returns>Atualização adicionada</returns>
+        /// <param name="code">Código do pacote</param>
+        /// <param name="model">Dados do pacote</param>
+        /// <returns>Atualização de pacote realizada</returns>
         /// <response code="200">Pacote atualizado</response>
         /// <response code="400">O pacote não foi encontrado ou ele já teve alguma atualização, e por isso não pode mais ser alterado</response>
+        /// <response code="500">Ocorreu algum erro</response>
         [HttpPut("{code}")]
-        public IActionResult Put(string code, AddPackageInputModel model)
+        public async Task<IActionResult> PutAsync(string code, AddPackageInputModel model)
         {
             try
             {
@@ -123,7 +150,28 @@ namespace PackageTrackerAPI.Controllers
                     return NotFound();
                 }
 
-                package.UpdatePackage(model.Title, model.Weight);
+                package.UpdatePackage(model.Title, model.Weight, model.SenderName, model.SenderEmail);
+
+                if (package.SenderEmail != null && package.SenderName != null)
+                {
+                    var message = new SendGridMessage
+                    {
+                        From = new EmailAddress("hgomes.andrade@gmail.com", "Henrique Andrade"),
+                        Subject = "Your Package was updated",
+                        PlainTextContent = 
+                            $@"Your package '{package.Title}' with code {package.Code} was updated, his actual data is: 
+                               Title: {package.Title}
+                               Weight: {package.Weight}
+                               SenderEmail: {package.SenderEmail}
+                               SenderName: {package.SenderName}"
+                    };
+
+                    message.AddTo(package.SenderEmail, package.SenderName);
+
+                    await _sendGridClient.SendEmailAsync(message);
+                }
+
+                
                 _repository.Update(package);
 
                 return Ok(package);
@@ -133,10 +181,10 @@ namespace PackageTrackerAPI.Controllers
             {
                 return BadRequest(e.Message);
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError,
-                    "Error updating data");
+                    $"Error updating data - {e.Message}");
             }
 
         }
@@ -150,12 +198,14 @@ namespace PackageTrackerAPI.Controllers
         ///     "delivered": false
         /// }
         /// </remarks>
+        /// <param name="code">Código do pacote</param>
         /// <param name="model">Atualizações do pacote</param>
         /// <returns>Atualização adicionada</returns>
         /// <response code="201">Cadastro realizado com sucesso</response>
         /// <response code="400">Dados estão inválidos ou o pacote já foi entregue, portanto não pode ter novas atualizações</response>
+        /// <response code="500">Ocorreu algum erro</response>
         [HttpPost("{code}/Updates")]
-        public IActionResult PostUpdate(string code, AddPackageUpdateInputModel model)
+        public async Task<IActionResult> PostUpdateAsync(string code, AddPackageUpdateInputModel model)
         {
             try
             {
@@ -166,7 +216,36 @@ namespace PackageTrackerAPI.Controllers
                     return NotFound();
                 }
 
-                package.AddUpdate(model.Status, model.Delivered);
+                var packageUpdate = package.AddUpdate(model.Status, model.Delivered);
+
+                if (package.SenderEmail != null && package.SenderName != null)
+                {
+                    if (package.Delivered)
+                    {
+                        var message = new SendGridMessage
+                        {
+                            From = new EmailAddress("hgomes.andrade@gmail.com", "Henrique Andrade"),
+                            Subject = "Your Package was delivered",
+                            PlainTextContent = $"Your package '{package.Title}' with code {package.Code} was delivered!!"
+
+                        };
+                        message.AddTo(package.SenderEmail, package.SenderName);
+                        await _sendGridClient.SendEmailAsync(message);
+                    }
+                    else
+                    {
+                        var message = new SendGridMessage
+                        {
+                            From = new EmailAddress("hgomes.andrade@gmail.com", "Henrique Andrade"),
+                            Subject = "Your Package has a new Update",
+                            PlainTextContent = $"Your package '{package.Title}' with code {package.Code} has a new update: {packageUpdate.Status}"
+
+                        };
+                        message.AddTo(package.SenderEmail, package.SenderName);
+
+                        await _sendGridClient.SendEmailAsync(message);
+                    }
+                }
 
                 _repository.Update(package);
 
@@ -177,10 +256,10 @@ namespace PackageTrackerAPI.Controllers
             {
                 return BadRequest(e.Message);
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError,
-                    "Error retrieving data from the database");
+                    $"Error retrieving data from the database - {e.Message}");
             }
         }
 
@@ -194,17 +273,19 @@ namespace PackageTrackerAPI.Controllers
         /// }
         ///
         /// </remarks>
-        /// <param name="model">Atualizações do pacote</param>
-        /// <returns>Atualização adicionada</returns>
+        /// <param name="code">Código do pacote</param>
+        /// <param name="updateId">Id de uma atualização do pacote</param>
+        /// <param name="model">Dados do pacote</param>
+        /// <returns>Atualização de pacote adicionada</returns>
         /// <response code="200">Pacote atualizado</response>
         /// <response code="400">O pacote ou a atualização não foram encontrados</response>
+        /// <response code="500">Ocorreu algum erro</response>
         [HttpPut("{code}/Updates/{updateId}")]
-        public IActionResult PutUpdates(string code, int updateId, AddPackageUpdateInputModel model)
+        public async Task<IActionResult> PutUpdatesAsync(string code, int updateId, AddPackageUpdateInputModel model)
         {
             try
             {
                 var package = _repository.GetByCode(code);
-
 
                 if (package == null)
                 {
@@ -221,6 +302,25 @@ namespace PackageTrackerAPI.Controllers
                 package.UpdatePackage(model.Delivered);
                 packageUpdate.UpdatePackageUpdateStatus(model.Status);
 
+                if (package.SenderEmail != null && package.SenderName != null)
+                {
+                    if (package.Delivered)
+                    {
+                        var message = new SendGridMessage
+                        {
+                            From = new EmailAddress("hgomes.andrade@gmail.com", "Henrique Andrade"),
+                            Subject = "Your Package was delivered",
+                            PlainTextContent = $"Your package '{package.Title}' with code {package.Code} was delivered!!"
+
+                        };
+
+                        message.AddTo(package.SenderEmail, package.SenderName);
+
+                        await _sendGridClient.SendEmailAsync(message);
+
+                    } 
+                }
+
                 _repository.Update(package);
 
                 return Ok(package);
@@ -229,22 +329,22 @@ namespace PackageTrackerAPI.Controllers
             {
                 return BadRequest(e.Message);
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError,
-                    "Error updating data");
+                    $"Error updating data - {e.Message}");
             }
 
         }
 
-
         /// <summary>
         /// Apaga um pacote e suas atualizações
         /// </summary>
-        /// <param name="model">Deleção do pacote</param>
-        /// <returns>Remoção concluída</returns>
+        /// <param name="code">Código do pacote</param>
+        /// <returns>Pacote apagado</returns>
         /// <response code="204">Pacote Removido</response>
         /// <response code="400">O pacote não foi encontrado</response>
+        /// <response code="500">Ocorreu algum erro</response>
         [HttpDelete("{code}")]
         public IActionResult Delete(string code)
         {
@@ -262,10 +362,10 @@ namespace PackageTrackerAPI.Controllers
                 return NoContent();
 
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError,
-                    "Error deleting data database");
+                    $"Error deleting data - {e.Message}");
             }
         }
     }

@@ -3,6 +3,7 @@ using Microsoft.OpenApi.Models;
 using PackageTrackerAPI.Entities;
 using PackageTrackerAPI.Persistence;
 using PackageTrackerAPI.Persistence.Repository;
+using SendGrid.Extensions.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +13,10 @@ var connectionString = builder.Configuration.GetConnectionString("PackageTracker
 builder.Services.AddDbContext<PackageTrackerContext>(c => c.UseSqlServer(connectionString));
 
 builder.Services.AddScoped<IPackageRepository, PackageRepository>();
+
+var sendGridApiKey = builder.Configuration.GetSection("SendGridApiKey").Value;
+
+builder.Services.AddSendGrid(o => o.ApiKey = sendGridApiKey); 
 
 builder.Services.AddControllers();
 
